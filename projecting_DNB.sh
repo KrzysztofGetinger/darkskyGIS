@@ -17,14 +17,18 @@ PROGRAM=$0
 function usage {
 	echo -e "usage: $PROGRAM [input] [epsg_code] [output]\n"
 	echo "	input - HDF VIIRS DNB input dataset path" 
-	echo "	epsg_code - CRS of output GTiff, only number"
+	echo "	epsg_code - CRS of output GTiff, only EPSG code number, supporting only projected coordinate systems in meters"
 	echo -e "	output - GTiff output dataset path\n"
 	echo -e "Example:\n"
-	echo -e "$ ./projecting_DNB GDNBO-SVDNB_j01_d20190403_t0007122_e0012522_b07103_c20200511165707163969_noac_ops.h5 4258 viirs_dnb_central_europe_20190403.tif\n"
-	exit 1
+	echo -e "$ ./projecting_DNB GDNBO-SVDNB_j01_d20190403_t0007122_e0012522_b07103_c20200511165707163969_noac_ops.h5 32634 viirs_dnb_central_europe_20190403.tif\n"
 }
 
-usage
+
+if [[ ( $1 == "--help") || ( $1 == "-h" ) || ( $# -eq 0 ) ]];
+	then 
+	usage
+	exit 1
+fi	
 
 #====================================================================================
 
@@ -46,7 +50,7 @@ export LONGITUDES=$(gdalinfo $INPUT_DATASET | grep Longitude_TC | grep NAME | \
 
 
 #Converting HDF dataset into temporary Geotiff and assinging 0 as ignore-value
-gdal_translate -of GTiff -a_nodata 0 $INPUT_DATASET dnb_tmpfile.tif
+gdal_translate -of GTiff -a_nodata 0 $INPUT_DATA dnb_tmpfile.tif
 
 #Converting temporary Geotiff into a temporary virtual raster
 gdal_translate -of VRT dnb_tmpfile.tif dnb_tmpfile.vrt
