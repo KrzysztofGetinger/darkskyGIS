@@ -24,10 +24,11 @@ PROGRAM=$0
 
 function usage {
 	echo -e "usage: $PROGRAM [input] [epsg_code] [output]\n"
-	echo "	-in|--input; input file - HDF VIIRS DNB input dataset path" 
-	echo "	-e|--epsg; epsg_code - CRS of output GTiff, only EPSG code number, supporting only projected coordinate systems in meters"
-	echo -e "-out|--output; output file - GTiff output dataset path\n"
-	echo -e "-t|--twilight_mask; use twilight mask; masks out pixels lighted indirectly by the Sun under the horizon\n"
+	echo -e " -in   | --input; input file - HDF VIIRS DNB input dataset path" 
+	echo -e " -e    | --epsg; epsg_code - CRS of output GTiff, only EPSG code number, supporting only projected coordinate systems in meters"
+	echo -e " -out  | --output; output file - GTiff output dataset path\n"
+	echo -e " -t    | --twilight_mask; use twilight mask; masks out pixels lighted indirectly by the Sun under the horizon\n"
+	echo -e " -tSZA | --twilight_SZA; specify solar zenith angle used for twilight mask\n"
 	echo -e "Example:\n"
 	echo -e "$ ./projecting_DNB -in GDNBO-SVDNB_j01_d20190403_t0007122_e0012522_b07103_c20200511165707163969_noac_ops.h5 -e 32634 -out viirs_dnb_central_europe_20190403.tif\n"
 }
@@ -59,6 +60,8 @@ infile=
 outfile=
 epsg=
 twilight_mask="false"
+twilight_SZA=108
+
 
 # Args while-loop
 while [ "$1" != "" ];
@@ -73,8 +76,11 @@ do
    -e  | --epsg  )  shift
 	   	      epsg=$1
                           	  ;;
-   -t  | --twilight_mask  ) twilight_mask="true"
+   -t  | --twilight_mask  ) twilight_mask="true"	   
                           ;;
+   -tSZA  | --twilight_SZA ) shift
+	   			twilight_SZA=$1
+				 ;;		   
    -h   | --help )        usage
                           exit
                           ;;
@@ -111,13 +117,15 @@ gdal_translate -of GTiff -a_nodata 0 $INPUT_DATA dnb_tmpfile.tif
 
 #Masking out pixels lighted indirectly by the Sun under the horizon if wanted
 if [ $twilight_mask == "true" ] ; then
-       	echo "Using twilight mask"
+       	echo "Using twilight mask with solar zenith angle $twilight_SZA"
 	#Adding solar zenith data
 	export SOLAR_ZENITH=$(gdalinfo $INPUT_DATASET | grep SolarZenith | grep NAME | \
         								awk -F  = '{print $2}')	
 	gdal_translate -of GTiff -a_nodata 0 $SOLAR_ZENITH solar_tmpfile.tif
-	gdal_calc.py -A solar_tmpfile.tif --calc="A>=108" --format=GTiff --outfile=solar_mask.tif --quiet
+	gdal_calc.py -A solar_tmpfile.tif --calc="A>=$twilight_SZA" --format=GTiff --outfile=solar_mask.tif --quiet
 	gdal_calc.py -A solar_mask.tif -B dnb_tmpfile.tif --calc="A*B" --format=GTiff --outfile=dnb_tmpfile.tif --quiet --overwrite
+	rm -f solar_tmpfile.tif
+	rm -f solar_mask.tif
 fi
 
 #Converting temporary Geotiff into a temporary virtual raster
